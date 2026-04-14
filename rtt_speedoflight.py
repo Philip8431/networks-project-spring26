@@ -238,5 +238,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    measure_rtt(urllib.request.urlopen(),PROBES);
     
