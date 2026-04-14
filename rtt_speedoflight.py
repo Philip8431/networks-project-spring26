@@ -70,6 +70,17 @@ def measure_rtt(url: str, probes: int = PROBES) -> dict:
 
     for _ in range(probes):
         # TODO: send probe
+        try:
+            start = time.perf_counter()
+            urllib.request.urlopen(url, timeout=3)
+            end = time.perf_counter()
+
+            elapsed = (end - start) * 1000  # ms
+            samples.append(elapsed)
+
+        except:
+            lost += 1
+            
         time.sleep(0.2)
 
     if not samples:
@@ -77,7 +88,18 @@ def measure_rtt(url: str, probes: int = PROBES) -> dict:
                 "loss_pct": 100.0, "samples": []}
 
     # TODO: compute and return stats
-    return {}  # placeholder
+    min_ms = min(samples)
+    mean_ms = float(np.mean(samples))
+    median_ms = float(np.median(samples))
+    loss_pct = (lost / probes) * 100
+
+    return {
+        "min_ms": min_ms,
+        "mean_ms": mean_ms,
+        "median_ms": median_ms,
+        "loss_pct": loss_pct,
+        "samples": samples
+    }  # placeholder
 
 
 # ─────────────────────────────────────────────
@@ -216,3 +238,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    measure_rtt(urllib.request.urlopen(),PROBES);
+    
