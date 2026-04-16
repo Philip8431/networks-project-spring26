@@ -120,7 +120,19 @@ def great_circle_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float
     """
     R = 6371
     # TODO
-    return 0.0  # placeholder
+    
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c
 
 
 def get_my_location() -> tuple[float, float, str]:
@@ -150,7 +162,26 @@ def compute_inefficiency(results: dict, src_lat: float, src_lon: float) -> dict:
     """
     for city, data in results.items():
         # TODO
-        pass
+        
+        lat2, lon2 = data["coords"]
+
+        distance = great_circle_km(src_lat, src_lon, lat2, lon2)
+        theoretical = 2 * (distance / FIBER_SPEED_KM_S) * 1000
+
+        median = data.get("median_ms")
+        
+        if median is not None:
+            ratio = median / theoretical
+            high = ratio > 3.0
+        else:
+            ratio = None
+            high = False
+
+        data["distance_km"] = distance
+        data["theoretical_min_ms"] = theoretical
+        data["inefficiency_ratio"] = ratio
+        data["high_inefficiency"] = high
+    
     return results
 
 
@@ -189,6 +220,21 @@ def make_plots(results: dict):
     # ── Figure 1 ──────────────────────────────
     fig, ax = plt.subplots(figsize=(11, 6))
     # TODO
+    x = np.arange(len(cities))
+    width = 0.35
+
+    measured = [valid[c]["median_ms"] for c in cities]
+    theoretical = [valid[c]["theoretical_min_ms"] for c in cities]
+
+    ax.bar(x - width/2, measured, width, label="Measured RTT")
+    ax.bar(x + width/2, theoretical, width, label="Theoretical Min")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(cities, rotation=45, ha="right")
+    ax.set_ylabel("RTT (ms)")
+    ax.set_title("Measured RTT vs Theoretical Minimum")
+    ax.legend()
+    
     plt.tight_layout()
     plt.savefig(f"{FIGURES_DIR}/fig1_rtt_comparison.png", dpi=150, bbox_inches="tight")
     plt.close()
@@ -196,6 +242,26 @@ def make_plots(results: dict):
     # ── Figure 2 ──────────────────────────────
     fig, ax = plt.subplots(figsize=(10, 7))
     # TODO
+    for city in cities:
+        d = valid[city]
+        x = d["distance_km"]
+        y = d["median_ms"]
+        color = CONTINENT_COLORS[d["continent"]]
+
+        ax.scatter(x, y, color=color)
+        ax.text(x, y, city, fontsize=8)
+
+    distances = np.linspace(0, max(valid[c]["distance_km"] for c in cities), 200)
+    theoretical_line = 2 * (distances / FIBER_SPEED_KM_S) * 1000
+
+    ax.plot(distances, theoretical_line, linestyle="dashed", label="Theoretical Min")
+
+    legend_handles = [
+        mpatches.Patch(color=color, label=continent)
+        for continent, color in CONTINENT_COLORS.items()
+    ]
+    ax.legend(handles=legend_handles)
+    
     plt.tight_layout()
     plt.savefig(f"{FIGURES_DIR}/fig2_distance_scatter.png", dpi=150, bbox_inches="tight")
     plt.close()
@@ -238,4 +304,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
